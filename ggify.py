@@ -9,7 +9,7 @@ import huggingface_hub
 import tqdm
 from huggingface_hub.hf_api import RepoFile
 
-hf_token = huggingface_hub.get_token()
+hf_token = ""
 
 KNOWN_QUANTIZATION_TYPES = {
     "q4_0",
@@ -187,30 +187,29 @@ def convert_pth_to_types(
 
 def download_repo(repo, dirname):
     files = list(huggingface_hub.list_repo_tree(repo, token=hf_token))
-    if not any(fi.rfilename.startswith("pytorch_model") for fi in files):
+    if not any(isinstance(fi, RepoFile) and fi.rfilename.startswith("pytorch_model") for fi in files):
         print(
             f"Repo {repo} does not seem to contain a PyTorch model, but continuing anyway"
         )
 
     with tqdm.tqdm(files, unit="file", desc="Downloading files...") as pbar:
-        fileinfo: RepoFile
         for fileinfo in pbar:
-            filename = fileinfo.rfilename
-            basename = os.path.basename(filename)
-            if basename.startswith("."):
-                continue
-            if basename.endswith(".gguf"):
-                continue
-            if os.path.isfile(os.path.join(dirname, filename)):
-                continue
-            pbar.set_description(f"{filename} ({fileinfo.size // 1048576:d} MB)")
-            huggingface_hub.hf_hub_download(
-                repo_id=repo,
-                filename=filename,
-                local_dir=dirname,
-                token=hf_token,
-            )
-
+            if isinstance(fileinfo, RepoFile):
+                filename = fileinfo.rfilename
+                basename = os.path.basename(filename)
+                if basename.startswith("."):
+                    continue
+                if basename.endswith(".gguf"):
+                    continue
+                if os.path.isfile(os.path.join(dirname, filename)):
+                    continue
+                pbar.set_description(f"{filename} ({fileinfo.size // 1048576:d} MB)")
+                huggingface_hub.hf_hub_download(
+                    repo_id=repo,
+                    filename=filename,
+                    local_dir=dirname,
+                    token=hf_token,
+                )
 
 def main():
     quants = ",".join(KNOWN_QUANTIZATION_TYPES)
